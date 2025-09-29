@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>密码映射转换器</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4edf9 100%);
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .container {
+            max-width: 600px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+            padding: 30px;
+            text-align: center;
+        }
+        
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 25px;
+            font-size: 22px;
+        }
+        
+        .input-group {
+            margin: 20px 0;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 15px;
+            color: #4a5568;
+            font-weight: 500;
+            font-size: 16px;
+        }
+        
+        .digits-container {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin: 0 auto;
+            max-width: 300px;
+        }
+        
+        .digit-input {
+            width: 50px;
+            height: 50px;
+            padding: 0;
+            font-size: 24px;
+            text-align: center;
+            border: 2px solid #cbd5e1;
+            border-radius: 8px;
+            outline: none;
+            transition: all 0.2s;
+            font-weight: bold;
+        }
+        
+        .digit-input:focus {
+            border-color: #4299e1;
+            transform: scale(1.05);
+        }
+        
+        .digit-input::placeholder {
+            color: #a0aec0;
+        }
+        
+        button {
+            background: #48bb78;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            margin-top: 20px;
+            transition: background 0.2s;
+        }
+        
+        button:hover {
+            background: #38a169;
+        }
+        
+        .result {
+            margin-top: 25px;
+            padding: 15px;
+            background: #f0f9ff;
+            border-radius: 8px;
+            border: 1px solid #bee3f8;
+            display: none;
+        }
+        
+        .result h3 {
+            color: #2b6cb0;
+            margin-bottom: 10px;
+        }
+        
+        .mapped-password {
+            font-size: 28px;
+            font-weight: bold;
+            color: #2b6cb0;
+            letter-spacing: 6px;
+            margin: 10px 0;
+        }
+        
+        .instructions {
+            color: #718096;
+            font-size: 13px;
+            margin-top: 20px;
+            line-height: 1.5;
+        }
+        
+        .position-labels {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin: 8px auto 15px;
+            max-width: 300px;
+            font-size: 12px;
+            color: #718096;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>密码映射转换器</h1>
+        
+        <div class="input-group">
+            <label for="digit1">请输入4位原始密码：</label>
+          
+            <div class="digits-container">
+                <input type="text" id="digit1" class="digit-input" maxlength="1" placeholder="0">
+                <input type="text" id="digit2" class="digit-input" maxlength="1" placeholder="0">
+                <input type="text" id="digit3" class="digit-input" maxlength="1" placeholder="0">
+                <input type="text" id="digit4" class="digit-input" maxlength="1" placeholder="0">
+            </div>
+        </div>
+        
+        <button onclick="convertPassword()">转换密码</button>
+        
+        <div class="result" id="result">
+            <h3>转换结果</h3>
+            <div class="mapped-password" id="mappedPassword"></div>
+        </div>
+        
+        <div class="instructions">
+            每个框输入1位数字（0-9），系统将根据内部映射规则转换为新密码<br>
+        </div>
+    </div>
+
+    <script>
+        // 固定的4x10映射矩阵（隐藏）
+        const mappingMatrix = [
+            [0, 3, 7, 1, 9, 4, 2, 8, 5, 6], // 第1位映射
+            [1, 4, 8, 2, 0, 5, 3, 9, 6, 7], // 第2位映射
+            [2, 5, 9, 3, 1, 6, 4, 0, 7, 8], // 第3位映射
+            [6, 3, 0, 4, 2, 7, 5, 1, 8, 9]  // 第4位映射
+        ];
+
+        // 自动跳转到下一个输入框
+        function setupAutoNavigation() {
+            const inputs = [document.getElementById('digit1'), 
+                           document.getElementById('digit2'), 
+                           document.getElementById('digit3'), 
+                           document.getElementById('digit4')];
+            
+            inputs.forEach((input, index) => {
+                // 输入数字后自动跳转
+                input.addEventListener('input', function() {
+                    if (this.value.length === 1 && index < 3) {
+                        inputs[index + 1].focus();
+                    }
+                });
+                
+                // 支持退格键跳转到上一个
+                input.addEventListener('keydown', function(e) {
+                    if (e.key === 'Backspace' && this.value === '' && index > 0) {
+                        inputs[index - 1].focus();
+                    }
+                });
+                
+                // 只允许数字输入
+                input.addEventListener('keypress', function(e) {
+                    if (!/[0-9]/.test(e.key)) {
+                        e.preventDefault();
+                    }
+                });
+            });
+        }
+
+        function convertPassword() {
+            const digits = [
+                document.getElementById('digit1').value.trim(),
+                document.getElementById('digit2').value.trim(),
+                document.getElementById('digit3').value.trim(),
+                document.getElementById('digit4').value.trim()
+            ];
+            
+            const resultDiv = document.getElementById('result');
+            const mappedPasswordEl = document.getElementById('mappedPassword');
+
+            // 验证输入
+            for (let i = 0; i < 4; i++) {
+                if (digits[i] === '' || !/^[0-9]$/.test(digits[i])) {
+                    alert(`请在第${i+1}位输入一个数字（0-9）！`);
+                    document.getElementById(`digit${i+1}`).focus();
+                    return;
+                }
+            }
+
+            const inputDigits = digits.map(Number);
+            const outputDigits = [];
+
+            // 逐位映射
+            for (let i = 0; i < 4; i++) {
+                const digit = inputDigits[i];
+                const mappedDigit = mappingMatrix[i][digit];
+                outputDigits.push(mappedDigit);
+            }
+
+            const result = outputDigits.join('');
+            
+            // 显示结果
+            mappedPasswordEl.textContent = result;
+            resultDiv.style.display = 'block';
+        }
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            setupAutoNavigation();
+            
+            // 回车键支持
+            document.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    convertPassword();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
